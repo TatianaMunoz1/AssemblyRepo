@@ -1,0 +1,138 @@
+#include <P16F628A.INC>
+
+		list  p=16f628a
+		__config 3f10
+;****************************************************
+;VARIABLES
+;****************************************************
+contador1     EQU 0x22 ;variables utilizados en la retardo
+contador2     EQU 0x23
+;*****************************************************
+;POSICION DE MEMORIA
+;*****************************************************
+				ORG	 0X00
+          		GOTO inicio
+         		ORG  0X04
+          		GOTO interrupciones
+;****************************************************** 
+;SUBRUTINA DE INTERRUPCIONES
+;******************************************************         
+interrupciones  BCF		INTCON,GIE		;desactiva interrupciones globales
+                BCF		INTCON,INTF		;desactiva interrupciones por rb0
+                BSF		PORTB,1			;para el motor
+detener         BTFSS	PORTB,0			;verificamos si sigue abierta la puerta
+                GOTO 	fin_inter		;si la puerta no esta abierta termina la interrupcion
+                GOTO	detener			;si la puerta esta abierta no se mueve el motor
+fin_inter       BSF     INTCON,GIE		;activa interrupciones globales
+                RETFIE					;vuelve al programa principal
+;******************************************************   
+;PROGRAMA PRINCIPAL             
+;******************************************************
+inicio  	    BCF		STATUS,5		;seleccion del banco 0
+                BSF		INTCON,GIE		;activa interrupciones globales
+                BSF		INTCON,INTF		;activa interrupcion del puerto RB0
+                MOVLW	0x07			;elimina comparadores
+                MOVWF	CMCON
+                BSF		STATUS,5		;seleccion del banco 1
+                BCF		OPTION_REG,7	;activacion de los pull-ups internos
+                BSF		OPTION_REG,6	;se activa de subida
+                MOVLW	B'11110001'
+                MOVWF	TRISB			;rb1,rb2 y rb3 salida, los demas entradas
+                MOVLW	B'11111111'
+                MOVWF	TRISA			;porta entrada
+                BCF		STATUS,5
+                ;clrf PORTA
+                ;clrf PORTB
+                BCF		PORTB,1			;activa motor
+                BSF   	PORTB,2			;sentido para abajo hasta que se active el sensor 0
+bajar_a_pb      BTFSS 	PORTA,0 		;pregunta si esta en planta baja
+                GOTO   	bajar_a_pb 		;si no vuelve a preguntar
+verifica        CLRF   	PORTB
+                BSF    	PORTB,1			;para el motor
+                BTFSS  	PORTB,6 		;verifca si esta pulsado el boton del segundo piso
+                GOTO   	verifica1 		;sino va a la subrutina siguiente
+                CALL   	delay 			;si se apreto llama a la subrutina delay
+                BTFSC  	PORTB,6 		;verifica de nuevo si se apreto el boton del segundo piso
+                CALL  	ir_a_piso2 		;si esta en 1 llama a ir a piso 2
+verifica1       BTFSS  	PORTB,5 		;verifca si esta pulsado el boton del primer piso
+                GOTO   	verifica2 		;sino va a la subrutina siguiente
+                CALL   	delay 			;si se apreto llama a la subrutina delay
+                BTFSC  	PORTB,5 		;verifica de nuevo si se apreto el boton del primer piso
+                CALL   	ir_a_piso1 		;si esta en 1 llama a ir a piso 1
+verifica2       BTFSS  	PORTB,4			;verifca si esta pulsado el boton de planta baja
+                GOTO 	verifica 		;si no se apreto va a la subrutina bucle
+                CALL   	delay 			;si se apreto llama a la subrutina delay
+                BTFSC  	PORTB,4 		;verifica de nuevo si se apreto el boton de planta baja
+                CALL   	ir_a_pb 		;llama a ir a planta baja
+                GOTO   	verifica 		;vuelve al bucle
+;*************************************************************
+;PISO 2
+;*************************************************************
+ir_a_piso2      BTFSC  	PORTA,2 		;verifica si esta en el piso 2
+                goto   	fin 			;si esta en ese piso termina el proceso
+                btfss  	PORTA,0 		;verifica si esta en planta baja
+                btfsc  	PORTA,1 		;verifica si esta en el primer piso
+                CALL   	sube 			;llama a la funcion subir
+seguir          BTFSS  	PORTA,2 		;verifica si esta en el piso 2
+                GOTO   	seguir 			;si no llego al piso 2 sigue subiendo
+fin             RETURN 					;si llego vuelve de donde lo llamaron
+;************************************************************
+;PISO 1
+;************************************************************
+
+ir_a_piso1      BTFSC 	PORTA,1 		;verifica si esta en el primer piso
+                GOTO   	fin2 			;si esta en ese piso termina el proceso
+                BTFSC  	PORTA,0 		;verifica si esta en planta baja
+                GOTO   	subir2 			;si es asi va a subir2
+                GOTO   	verifica3 		;si no va a la subrutina verifica3
+subir2          CALL   	sube 			;llama a la funcion sube
+                GOTO   	fin2 			;va a la subrutina
+verifica3       BTFSC  	PORTA,2 		;verifica si esta en el segundo piso
+                CALL   	baja 			;si es asi llama a la funcion bajar
+fin2            BTFSS  	PORTA,1 		;verifica si esta en el primer piso
+                GOTO   	fin2 			;sino esta en el primer piso va a la subrutina 
+                RETURN 					;si llego vuelve
+;*************************************************************
+;PLANTA BAJA
+;*************************************************************
+ir_a_pb         BTFSC  	PORTA,0 		;verifica si esta en planta baja
+                GOTO   	fin3 			;si esta en ese piso termina el proceso
+                BTFSS  	PORTA,2 		;verifica si esta en el segundo piso
+                BTFSC  	PORTA,1 		;verifica si esta en el primer piso
+                CALL   	baja 			;si esta en alguna de los dos llama a la funcion bajar
+seguir2         BTFSS  	PORTA,0 		;verifica si esta en planta baja
+                GOTO   	seguir2 		;si no llego a planta baja sigue bajando
+fin3            RETURN 					;si llego vuelve
+;*************************************************************
+;SUBE
+;*************************************************************
+sube            BCF    	PORTB,1 		;enciende el  motor
+                BCF    	PORTB,2 		;motor sube
+                RETURN
+;*************************************************************
+;BAJA
+;*************************************************************
+baja            BCF    	PORTB,1 		;enciende el motor
+                BSF    	PORTB,2 		;motor baja
+                RETURN
+;*************************************************************
+;DELAY
+;*************************************************************
+delay       	MOVLW   .100
+                MOVWF   contador1
+loop        	MOVLW   .110
+                MOVWF   contador2
+loop2      		NOP
+                NOP
+                NOP
+                NOP
+                NOP
+                NOP
+                DECFSZ  contador2,f
+                GOTO    loop2
+                DECFSZ  contador1,f
+                GOTO    loop
+                RETURN
+                END
+
+

@@ -1,0 +1,69 @@
+﻿#INCLUDE <P16F628A.INC>
+                        LIST P=16F628A
+CONT                EQU                0X20                        ;EQU =
+CONT1                EQU                0X21                        
+                        
+                        ORG                0X00
+                        BSF                STATUS,RP0                ;SE UBICA EN EL BANCO 0
+                        BCF                OPTION_REG,7        ;LIMIPIA OPTION_REG, SE PARA EN EL REGISTRO_OPTION, EL ,7 HABILITA  HABILITA LAS INTERRUPCIONES GLOBALES, SI PONGO LIMPIA ES C, NO S
+                        MOVLW        B'00000001'                ;PONE EL BIT 8 EN 1
+                        MOVWF        TRISB                        ;DE TRISB
+                        BCF                STATUS,RP0                ;LIMPIA EL BIT RP0
+
+
+APAGA                                                                ;PARA APAGAR EL BOTON
+                        BCF                PORTB,1                        ;LIMPIA BIT 1 PORTB
+                        BCF                PORTB,2                        ;IDEM BIT2
+
+
+ESPERAR                                                                ;RUTINA PARA ESPERAR A QUE SE PULSE
+                        BTFSC        PORTB,0                        ;PREGUNTO SI PORTB0 ESTA EN 0 O SEA SI ESTA PULSADO
+                        GOTO    ESPERAR                        ;SI NO ESTA EN 0, VUELVO A PREGUNTAR
+                        CALL        DELAY150MS                ;SI ESTA EN 1,LLAMO A DELAY PARA ESPERAR Y QUE NO HAGA POLLING
+                        BTFSC        PORTB,0                        ;Y VUELVO A PREGUNTAR SI PORTB0 ESTA EN 0, SI ESTA EN 0 SIGNIFICA QUE SIGUE PULSADO
+                        GOTO    ESPERAR                        ;SINO ESTA EN 0, VUELVO A PREGUNTAR
+                                                                        ;SI PASA TODOS LOS GOTO (FILTROS) ESTA PRENDIDO
+                        BSF                PORTB,1                        ;PONE EL BIT 1 DE PORTB EN 1, PORTB,BIT1
+                    BSF                PORTB,2                        ;IDEM CON EL 2,PORTB BIT2
+
+
+ESPERAR1                                                        ;ETIQUETA PARA VOLVER A ESPERAR DESPUES DE PRENDER
+                        BTFSC        PORTB,0                        ;PREGUNTO SI PORTB0 ESTA EN 0
+                        GOTO    ESPERAR1                ;SINO ESTA EN 0, VUELVO A PREGUNTAR
+                        CALL        DELAY150MS                ;ESPERO
+                        BTFSC        PORTB,0                        ;Y VUELVO A PREGUNTAR SI PORTB0 ESTA EN 0
+                        GOTO    ESPERAR1                ;SINO ESTA EN 0, VUELVO A PREGUNTAR
+                        GOTO        APAGA                        ;VA PARA QUE SE APAGUE
+                        GOTO        $
+                                                                        ;EMPIEZA LA DEMORA, PORQUE SINO HACE POLLING
+
+
+DELAY1MS                                                        ;funcion demora 1ms
+                        MOVLW        .250                        ;toma el valor 250
+                        MOVWF        CONT                        ;y lo pone en CONT
+
+
+LOOP1                
+                        NOP                                                ;Realiza NO oPeracion
+                        DECFSZ        CONT,F                        ;DECrementa CONT hasta 0
+                        GOTO        LOOP1                        ;Mientras CONT no sea 0, se repite
+                        RETURN                                        ;Cuando es 0, sale
+
+
+
+
+DELAY150MS                                                        ;funcion demora 250ms
+                        MOVLW        .150                        ;El valor 250
+                        MOVWF        CONT1                        ;lo pone en CONT1
+
+
+
+
+LOOP2                
+                        CALL        DELAY1MS                ;Llama a la funcion delay1ms
+                        DECFSZ        CONT1,F                        ;decrementa cont1
+                        GOTO        LOOP2                        ;sino es 0 se repite
+                        RETURN                                        ;si es 0 sale                        
+
+
+                        END
